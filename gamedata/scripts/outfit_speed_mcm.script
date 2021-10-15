@@ -1,0 +1,217 @@
+
+
+local DEBUG = false
+function print_dbg(txt, ...)
+	if DEBUG then
+		printf("speed | %s | " .. txt, time_global(), ...)
+	end
+end
+
+local last_check = nil
+local check_freq = 1000
+
+local function actor_on_update()
+    local tg = time_global()
+    if not last_check then
+        last_check = tg
+    end
+
+    if tg < last_check + check_freq then
+        return
+    end
+    last_check = tg
+    manage_weapon_speed()
+end
+
+function actor_item_to_ruck()
+    manage_outfit_speed()
+    manage_encumbrance()
+end
+
+function actor_item_to_slot()
+    manage_outfit_speed()
+    manage_encumbrance()
+end
+
+function actor_item_to_belt()
+    manage_encumbrance()
+end
+
+function actor_on_item_use()
+    manage_encumbrance()
+end
+
+local last_outfit = 0
+
+function manage_outfit_speed()
+    local outfit = db.actor:item_in_slot(7)
+    local outfit_id = outfit and outfit:id() or 0
+    local outfit_sec = outfit and outfit:section() or "no outfit"
+    if last_outfit ~= outfit_id then
+        last_outfit = outfit_id
+        local coef = outfit and get_outfit_speed(outfit, outfit_sec, false) or 1
+        local sprint_coef = outfit and get_outfit_speed(outfit, outfit_sec, true) or 1
+        print_dbg("Speed for %s is %s, sprint speed is %s", outfit_sec, coef, sprint_coef)
+        speed.add_speed("outfit_speed", coef, false, true)
+        speed.add_speed("outfit_sprint_speed", sprint_coef, true, true)
+    end
+end
+
+local last_weapon = 0
+
+function manage_weapon_speed()
+
+    if not get_config("weapon") then
+        speed.remove_speed("weapon_speed", coef, true, true)
+        return
+    end
+    local weapon = db.actor:active_item()
+    local weapon_id = weapon and weapon:id() or 0
+    if weapon_id ~= last_weapon then
+        local coef = 1
+        last_weapon = weapon_id
+        weapon_sec = (weapon and IsWeapon(weapon)) and weapon:section() or "no weapon"
+        local kind = weapon_sec == "no weapon" and weapon_sec or ini_sys:r_string_ex(weapon_sec,"kind")
+        if kind == "w_pistol" or kind ==  "w_melee" or kind == "no weapon" then        
+            coef = 1.08
+        elseif kind == "w_smg" then
+            coef = 1.04           
+        else
+            local weight = weapon:weight()
+            if weight <= 3.5 then
+                coef = 1
+            elseif weight <= 5.86 then
+                coef = 0.96
+            else
+                coef = 0.92
+            end
+        end
+        speed.add_speed("weapon_speed", coef, true, true)
+    end
+end
+
+local enc_table = {
+    1.08, -- 12% boost light
+    1,
+    0.92, -- 12% penalty heavy 
+    0.84, -- 24% penalty fat
+    -- exos
+    1.04, -- 6% boost light
+    1,
+    0.96, -- 6% penalty heavy 
+    0.92 -- 12% penalty fat
+}
+local last_tot_weight = 0
+local last_max_weight = 0
+
+function manage_encumbrance()
+
+    if not get_config("encumbrance") then
+        speed.remove_speed("encumbrance", coef, false, true)
+        return
+    end
+    local actor = db.actor
+	local tot_weight = actor:get_total_weight()
+    local max_weight = actor:get_actor_max_weight()
+	
+	local outfit = actor:item_in_slot(7)
+	local backpack = actor:item_in_slot(13)
+	max_weight = max_weight + (outfit and outfit:get_additional_max_weight() or 0)
+	max_weight = max_weight + (backpack and backpack:get_additional_max_weight() or 0)
+	actor:iterate_belt( function(owner, obj)
+		local c_arty = obj:cast_Artefact()
+		max_weight = max_weight + (c_arty and c_arty:AdditionalInventoryWeight() or 0)
+	end)
+    actor:cast_Actor():conditions():BoosterForEach( function(booster_type, booster_time, booster_value)
+		if (booster_type == 4) then --eBoostMaxWeight
+			max_weight = max_weight + booster_value
+		end
+	end)
+
+    if (tot_weight == last_tot_weight) and (max_weight == last_max_weight) then
+        return
+    else
+        last_tot_weight = tot_weight
+        last_max_weight = max_weight
+    end
+
+    local coef = tot_weight / max_weight
+    -- printf("Total weight is %s, max weight is %s.", tot_weight, max_weight)
+    local state = 0
+    if coef < 0.25 then
+        state = 1
+    elseif coef < 0.71 then
+        state = 2
+    elseif coef < 1 then
+        state = 3
+    else
+        state = 4
+    end
+    
+    if outfit and SYS_GetParam(0, outfit:section(), "repair_type") == "outfit_exo" then
+        state = state + 4
+    end
+    -- printf("Actor did something. Weight coef is %s. Update speed to %s",coef, speed_table[state])
+    speed.add_speed("encumbrance", enc_table[state], false, true)
+end
+
+local outfits = {}
+function get_outfit_speed(obj, sec, sprint)
+    if not sec then sec = obj:section() end
+    if is_empty(outfits) then
+        local speed_table = ini_file("items\\settings\\outfit_speed.ltx")
+        local n = speed_table:line_count("speed")
+        
+        for i=0,n-1 do
+            result, id, value = speed_table:r_line_ex("speed",i,"","")
+            print_dbg("%s: Caching %s, %s", "speed", id, value)
+            outfits[id] = {}
+            outfits[id].speed = value
+        end
+        n = speed_table:line_count("sprint_speed")
+        for i=0,n-1 do
+            result, id, value = speed_table:r_line_ex("sprint_speed",i,"","")
+            outfits[id].sprint = value
+        end
+
+    end
+
+    if obj and outfits[sec] ~= nil then
+        if sprint then
+            return outfits[sec].sprint ~= nil and tonumber(outfits[sec].sprint) or 1
+        else
+            return outfits[sec].speed ~= nil and tonumber(outfits[sec].speed) or 1
+        end
+    end
+    return 1
+end
+
+-- If you don't use MCM, change your defaults from here.
+local defaults = {
+    ["weapon"] = true,
+    ["encumbrance"] = true,
+    ["debug"] = false
+}
+
+function get_config(key)
+    if ui_mcm then return ui_mcm.get("speed/"..key) else return defaults[key] end
+end
+
+function on_mcm_load()
+    op = { id= "speed",sh=true ,gr={
+            { id= "title",type= "slide",link= "ui_options_slider_player",text="ui_mcm_speed_title",size= {512,50},spacing= 20 },
+            {id = "weapon", type = "check", val = 1, def = true},
+            {id = "encumbrance", type = "check", val = 1, def = false},
+            {id = "debug", type = "check", val = 1, def = false}
+        }
+    }
+    return op
+end
+
+function on_game_start()
+	RegisterScriptCallback("actor_on_update",actor_on_update)
+	RegisterScriptCallback("actor_item_to_ruck",actor_item_to_ruck)
+	RegisterScriptCallback("actor_item_to_slot",actor_item_to_slot)
+	RegisterScriptCallback("actor_item_to_belt",actor_item_to_belt)
+	RegisterScriptCallback("actor_on_item_use",actor_on_item_use)
+end 

@@ -1,0 +1,44 @@
+This addon gives speed bonuses and penalties to various outfits.
+
+There are three parts to this addon.
+
+1. Outfit Speed
+Light armors like jackets, Sunrise suits and LC suits receive anywhere from a 5-10% increase in movement speed. 
+Exoskeletons, exosuits and some heavy armors get anywhere from a 5-13% decrease in movement speed. 
+Other armors like SEVA, SSP, SKAT are untouched (they are balanced compared to exos by carryweight, but I can tweak this if desired). 
+This is completely configurable using outfit_speeds.ltx. 
+The speed modifier is displayed in outfit stats.
+
+2. Active item affects speed (Toggleable)
+Having a knife, axe, or handgun out confers an 8% sprint speed bonus.
+Having a submachinegun out confers a 4% bonus.
+Other weapons or items will either confer no bonus or slow the player down depending on weight, up to -8%.
+
+3. Encumbrance affects speed (Toggleable)
+The actor's total encumbrance (carried weight / max possible weight) affects their movespeed, like in Dark Souls.
+Under 25% total weight, the actor moves 8% faster.
+Above 70% weight, the actor moves 8% slower.
+Above 100% weight, the actor moves 16% slower.
+These bonuses and penalties are halved with exoskeletons.
+
+
+V1.2.1
+- Adjusted the formula for encumbrance.
+V1.2
+- Mainlined encumbrance as MCM option. Reworked formula for weapon speed (now gives penalty based on weapon weight).
+V1.1.7
+- Nerfed exosuit sprint speed (it's heavy after all). Added encumbrance addon as an optional goodie.
+V1.1.6
+- Some internal cleanup. Buffed base speed of Nosorog to match that of exoskeletons. Nerfed exo sprint speed by 10%, 20 for Nosorogs.
+V1.1.5
+- Monkey patched out dependency on utils_ui. Fixed bugs in speed.script, clamped minimum movement speed to be walking speed.
+V1.1.4
+- Small fix for crash on holster.
+V1.1.3
+- Refactor to be more modular. Update for 1.5.1.
+V1.1.2
+- Fix crash when removing outfits. Added speed reduction to exosuits.
+V1.1.1
+- Refactor to remove dependency on modifying outfit.ltx files. Compatibility with speed modification in my Powered Exos addon.
+V1.1 
+- Pistol and knife make you sprint 10% faster. Patch for exos updated to reflect 1.3.1 changes.

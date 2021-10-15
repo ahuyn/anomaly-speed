@@ -21,6 +21,7 @@ local function actor_on_update()
     end
     last_check = tg
     manage_weapon_speed()
+    manage_encumbrance()
 end
 
 function actor_item_to_ruck()

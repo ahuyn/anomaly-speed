@@ -24,7 +24,13 @@ jobs:
     steps:
       # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
       - uses: actions/checkout@v2
+        with:
+          submodules: recursive
 
+      - name: Install dependencies
+        id: speed_dep
+        run: cp -r anomaly-dependencies/speed/gamedata .
+        
       - name: Get current date
         id: date
         run: echo "::set-output name=today::$(date +'%Y.%m.%d')"

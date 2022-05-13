@@ -1,11 +1,15 @@
 
 
 local DEBUG = false
+local ini_speed = ini_file("items\\outfit_speed\\importer.ltx")
+
 function print_dbg(txt, ...)
-	if DEBUG then
+	if get_config("debug") then
 		printf("speed | %s | " .. txt, time_global(), ...)
 	end
 end
+
+
 
 local last_check = nil
 local check_freq = 1000
@@ -156,35 +160,19 @@ function manage_encumbrance()
     speed.add_speed("encumbrance", enc_table[state], false, true)
 end
 
-local outfits = {}
+-- local outfits = {}
 function get_outfit_speed(obj, sec, sprint)
     if not sec then sec = obj:section() end
-    if is_empty(outfits) then
-        local speed_table = ini_file("items\\settings\\outfit_speed.ltx")
-        local n = speed_table:line_count("speed")
-        
-        for i=0,n-1 do
-            result, id, value = speed_table:r_line_ex("speed",i,"","")
-            print_dbg("%s: Caching %s, %s", "speed", id, value)
-            outfits[id] = {}
-            outfits[id].speed = value
-        end
-        n = speed_table:line_count("sprint_speed")
-        for i=0,n-1 do
-            result, id, value = speed_table:r_line_ex("sprint_speed",i,"","")
-            outfits[id].sprint = value
-        end
-
+    local kind = SYS_GetParam(0, sec, "kind")
+    -- check for specific outfit
+    if ini_speed:section_exist(sec) then
+        -- do nothing
+        print_dbg("%s has custom speed", sec)
+    elseif ini_speed:section_exist(kind) then
+        sec = kind
     end
-
-    if obj and outfits[sec] ~= nil then
-        if sprint then
-            return outfits[sec].sprint ~= nil and tonumber(outfits[sec].sprint) or 1
-        else
-            return outfits[sec].speed ~= nil and tonumber(outfits[sec].speed) or 1
-        end
-    end
-    return 1
+    local to_search = sprint and "sprint_speed" or "speed"
+    return ini_speed:r_float_ex(sec, to_search) or 1
 end
 
 -- If you don't use MCM, change your defaults from here.
